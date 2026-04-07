@@ -20,84 +20,97 @@ logger = logging.getLogger(__name__)
 def initialize_ui() -> None:
     """
     Sets up the initial Streamlit page configuration and header.
-    
-    Args:
-        None
-        
-    Returns:
-        None
-        
-    Example:
-        >>> initialize_ui()
     """
-    st.set_page_config(page_title="AI Data Analyst Chatbot", page_icon="📊", layout="wide")
-    st.title("📊 AI Data Analyst Chatbot")
-    st.write("Upload a CSV/Excel file and ask analytical questions to generate insights and charts!")
+    st.set_page_config(page_title="AI Data Analyst", page_icon="🤖", layout="wide")
+    
+    # Inject Custom CSS for Premium Look
+    st.markdown("""
+        <style>
+        .main-header {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: -webkit-linear-gradient(45deg, #00E5FF, #4B8BFF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0px;
+        }
+        div[data-testid="stMetricValue"] {
+            font-size: 2rem;
+            color: #1E90FF;
+        }
+        .stChatMessage p {
+            font-size: 1.25rem !important;
+            line-height: 1.6;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    if os.path.exists("logo.png"):
+        # Display the logo cleanly by itself since the image natively contains the text
+        st.image("logo.png", width=280)
+    else:
+        st.markdown('<p class="main-header">🤖 AI Data Analyst Chatbot</p>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
 def handle_file_upload() -> Optional[pd.DataFrame]:
     """
     Handles file upload widget and parses the uploaded document.
-    
-    Args:
-        None
-    
-    Returns:
-        Optional[pd.DataFrame]: The loaded dataframe, or None if failed/empty.
-        
-    Example:
-        >>> df = handle_file_upload()
     """
     try:
-        uploaded_file = st.sidebar.file_uploader("Upload your dataset", type=["csv", "xlsx", "xls"])
+        # Centralized file uploader with a clean container
+        uploaded_file = st.file_uploader("📂 Upload a CSV or Excel dataset to unlock the Chat Interface", type=["csv", "xlsx", "xls"])
         
         if uploaded_file is not None:
-            with st.spinner("Loading and profiling data..."):
+            with st.spinner("Analyzing dataset structure..."):
                 df = load_document(uploaded_file, uploaded_file.name)
                 
                 if df is not None:
-                    st.sidebar.success("File uploaded successfully!")
-                    st.subheader("Data Profiling")
-                    st.write(f"**Shape:** {df.shape[0]} rows, {df.shape[1]} columns")
-                    st.write("**Data Preview:**")
-                    st.dataframe(df.head())
+                    # Reset memory state if a NEW file is uploaded
+                    if "current_file_name" not in st.session_state or st.session_state.current_file_name != uploaded_file.name:
+                        st.session_state.current_file_name = uploaded_file.name
+                        st.session_state.chunks = chunk_dataframe_to_text(df)
+                        st.session_state.messages = [] # Clear history on new file
+                        st.session_state.retriever_initialized = False # Force FAISS rebuild
+                        st.toast(f'Dataset "{uploaded_file.name}" loaded instantly!', icon='✅')
+                        st.balloons()
                     
-                    # RAG initialization (fallback / documentation validation test coverage)
-                    chunks = chunk_dataframe_to_text(df)
-                    st.session_state["chunks"] = chunks
+                    # Collapse profiling details gracefully
+                    with st.expander("📊 Data Profiling Metrics & Preview", expanded=False):
+                        st.info("The application has parsed your file and securely stored it in ephemeral memory.")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Rows Processed", f"{df.shape[0]:,}")
+                        col2.metric("Features (Columns)", df.shape[1])
+                        col3.metric("Missing Data Points", df.isna().sum().sum())
+                        
+                        st.markdown("**Data Snapshot (First 5 records):**")
+                        st.dataframe(df.head(5), use_container_width=True)
                     
                     return df
+       
+            
         return None
     except Exception as e:
         st.error(f"Could not load the file: {str(e)}")
         logger.error(f"File upload exception: {e}")
         return None
 
-def generate_response(df: pd.DataFrame, query: str) -> None:
+def generate_response(df: pd.DataFrame, query: str) -> str:
     """
     Uses LangChain Pandas Agent to process the user query on the dataset.
-    
-    Args:
-        df (pd.DataFrame): The dataset context.
-        query (str): Validated user question.
-        
-    Returns:
-        None
-        
-    Example:
-        >>> generate_response(df, "What is the highest value in column X?")
     """
     try:
-        # Check if API Keys are properly set before dispatching call
+        # Check if API Keys are properly set
         if not config.check_keys():
-            st.error("Missing or invalid GOOGLE_API_KEY. Please verify your .env file.")
-            return
+            st.error("⚠️ Missing or invalid API Key. Please verify your .env file.")
+            return "Server Error: API Key missing."
 
-        with st.spinner("Analyzing data and generating code..."):
-            # We initialize a Gemini model to power the code-generation agent logic
-            llm = ChatGoogleGenerativeAI(temperature=0, model="gemini-2.5-flash") # Using Flash for higher free tier limits
+        with st.chat_message("assistant"):
+            response_container = st.empty()
+            response_container.info("🧠 Thinking and writing python code... please wait.")
             
-            # Create pandas dataframe agent with allow_dangerous_code due to exec() security changes
-            # We allow it since it runs purely in memory on the user's uploaded dataframe
+            llm = ChatGoogleGenerativeAI(temperature=0, model="gemini-2.5-flash") 
+            
             agent = create_pandas_dataframe_agent(
                 llm, 
                 df, 
@@ -107,66 +120,71 @@ def generate_response(df: pd.DataFrame, query: str) -> None:
             )
             
             response = agent.invoke({"input": query})
+            output_text = response.get("output", "No output generated.")
             
-            st.write("### Analysis Results")
-            st.write(response.get("output", "No output generated."))
+            # Display output organically in Chat format
+            response_container.markdown(output_text)
             
-            # Simple demonstration of citations relying on our vector store
+            # Simple demonstration of citations
             try:
                 from utils.embedder import create_embeddings, get_embeddings_model
                 from utils.retriever import initialize_vector_store, retrieve_similar
                 
                 if "chunks" in st.session_state and st.session_state["chunks"]:
                     chunks = st.session_state["chunks"]
-                    # If store not initialized, init it here
-                    if "retriever_initialized" not in st.session_state:
+                    if not st.session_state.get("retriever_initialized"):
                          embs = create_embeddings(chunks)
                          initialize_vector_store(embs, chunks)
-                         st.session_state["retriever_initialized"] = True
+                         st.session_state.retriever_initialized = True
                          
-                    # Create query embedding via loaded model
                     model = get_embeddings_model()
                     q_vec = model.encode([query], convert_to_numpy=True).tolist()[0]
-                    # Retrieve the most highly matched document text
                     similar = retrieve_similar(q_vec, 1)
                     if similar:
-                        st.caption("Citations:")
-                        st.text(f"Relevant Data Snippet: {similar[0]['content'][:100]}...")
+                        with st.expander("🔍 View Retrieved Context / Citations"):
+                            st.caption(f"Semantic Match: {similar[0]['content'][:200]}...")
             except Exception as inner_e:
-                logger.warning(f"Failed to generate citation: {inner_e}")
+                pass # Hide citations if FAISS fails locally so UI doesn't visually break
                 
+            return output_text
             
-            st.download_button(
-                label="Download Result",
-                data=str(response.get("output", "")),
-                file_name="analysis_result.txt"
-            )
     except Exception as e:
         logger.error(f"Error during response generation: {e}")
-        st.error(f"An error occurred while analyzing the data: {e}")
+        error_msg = f"❌ An internal error occurred while analyzing the data.\n\n`{str(e)}`"
+        st.error(error_msg)
+        return error_msg
 
 def main() -> None:
-    """
-    Main application loop.
-    
-    Args:
-        None
-        
-    Returns:
-        None
-    """
     initialize_ui()
     
+    # Initialize message history array
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+        
     df = handle_file_upload()
     
     if df is not None:
-        query = st.chat_input("Ask a question about your data (e.g., 'Show me a bar chart of sales by region').")
-        if query:
+        st.markdown("---")
+        
+        # Display existing chat history
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        # Create persistent bottom chat bar
+        prompt = st.chat_input("Ask a question about your dataset! (e.g., 'What is the sum of Revenue grouped by Region?')")
+        if prompt:
             try:
-                # Validating input strictly to prevent malformed operations
-                valid_query = validate_query(query)
-                generate_response(df, valid_query)
-            except ValueError as ve:
+                valid_query = validate_query(prompt)
+                
+                st.session_state.messages.append({"role": "user", "content": valid_query})
+                with st.chat_message("user"):
+                    st.markdown(valid_query)
+                    
+                assistant_response = generate_response(df, valid_query)
+                st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+                
+            except Exception as ve:
                 st.error(str(ve))
 
 if __name__ == "__main__":
