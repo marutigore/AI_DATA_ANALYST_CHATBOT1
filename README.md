@@ -1,183 +1,236 @@
-# AI Data Analyst Chatbot
+# 🤖 AI Data Analyst Chatbot – The Complete Guide
 
-An intelligent application that acts as your personal data analyst. Upload a CSV or Excel dataset, chat with it in natural language, and let the AI generate Python code to uncover insights, calculate statistics, and render Plotly charts.
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-Framework-FF4B4B)
+![LangChain](https://img.shields.io/badge/LangChain-Orchestration-green)
+![Pandas](https://img.shields.io/badge/Pandas-DataProcessing-150458)
+![FAISS](https://img.shields.io/badge/FAISS-VectorStore-orange)
+
+Welcome to the definitive and comprehensive documentation for the **AI Data Analyst Chatbot**. This document contains every single detail about the project—from its core philosophy to the intricate, code-level execution lifecycle of the tool matrix.
 
 ---
 
-## Architecture Diagram
+## 📑 Table of Contents
+1. [Executive Summary / Problem Statement](#1-executive-summary--problem-statement)
+2. [Complete System Lifecycle](#2-complete-system-lifecycle-start-to-finish)
+3. [Deep Dive: Project Directory & Modules](#3-deep-dive-project-directory--modules)
+4. [Software Architecture & Data Flow Diagrams](#4-software-architecture--data-flow-diagrams)
+5. [Code-Level Execution Mechanics](#5-code-level-execution-mechanics)
+6. [Technology Definitions](#6-technology-definitions)
+7. [Comprehensive Setup & Execution Guide](#7-comprehensive-setup--execution-guide)
+8. [Example Queries & Capabilities](#8-example-queries--capabilities)
+9. [Limitations, Bottlenecks & Future Roadmap](#9-limitations-bottlenecks--future-roadmap)
+
+---
+
+## 1. Executive Summary / Problem Statement
+
+In modern business environments, raw tabular data (CSV, Excel) is abundant, but actionable insights are trapped behind steep learning curves requiring SQL, Pandas, or BI tool expertise. 
+
+The **AI Data Analyst Chatbot** serves as a translator: it allows non-technical users to speak to their data in plain English. Over the course of the project, we've developed an architecture that loads secure, local data, applies generative-AI models (powered by LLMs like Gemini/OpenAI) to write and execute python code on the fly, and returns visualized analytics directly to a web browser.
+
+---
+
+## 2. Complete System Lifecycle (Start to Finish)
+
+When a user interacts with the project, this is the exact, uninterrupted workflow from start to finish:
+
+1. **Initialization:** User boots the system via Streamlit. The application reads limits and allowed extensions from `config.py` and loads API Keys from `.env`.
+2. **Data Ingestion:** User drags a `.csv` or `.xlsx` into the sidebar.
+3. **Parsing & Validation:** `document_loader.py` securely bridges the bitstream into a Pandas `DataFrame`. It catches file corruption (`ParserError`) inherently.
+4. **Autonomous Profiling:** The UI instantly tells the user exactly how many rows/columns exist and renders a DataFrame preview.
+5. **RAG Pre-computation (Background):** While profiling, `chunker.py` transforms the tabular rows into strings, readying them for FAISS Vector Search if a semantic lookup is needed.
+6. **Query Ingress:** User types "Plot total sales grouped by region."
+7. **Query Sanitization:** `validator.py` checks if the query length exceeds the maximum token config buffer to defend against Prompt Injection and Token Overflows.
+8. **LLM Orchestration:** `app.py` spins up the LangChain `create_pandas_dataframe_agent`. It embeds the DataFrame schema into a system prompt alongside the user's query.
+9. **Code Synthesis & Execution:** The LLM hallucinates Python Pandas/Plotly code to solve the query. An internal execution sandbox runs this code via Python's AST (`exec()`).
+10. **Error Self-Correction Loop:** If the LLM spells a column name wrong and Python throws a `KeyError`, the Agent receives the traceback, rewrites its own code fixing the typo, and runs it again autonomously!
+11. **Output Rendering:** The agent produces either a Text String, a Pandas Dataframe, or a Plotly chart, which is rendered natively on Streamlit.
+12. **Session Lifecycle:** Once reloading, the in-memory data object is securely destroyed.
+
+---
+
+## 3. Deep Dive: Project Directory & Modules
+
+Every file in this project is strictly isolated to handle one specific layer of the architecture.
+
 ```text
-[User] 
-  | (Upload CSV/Excel & Text Query)
-  v
-[Streamlit Frontend UI]
-  |  (DataFrame / Query String) 
-  v
-[Document Loader] ---> [Validator]
-  | (Pandas DataFrame)     | (Sanitized Query String)
-  v                        v
-[LangChain Pandas Agent] <--- (Context Injection & Prompt)
-  | (Generated Python Code via LLM: gpt-3.5/gpt-4o)
-  v
-[Code Execution Engine (sandbox)]
-  | (Scalars, DataFrames, Plotly Figure Objects)
-  v
-[Streamlit Frontend UI] ---> [User sees Insight / Chart Inline]
-
-(Fallback Document RAG Pathway)
-[Pandas DataFrame] -> [Chunker] -> (List[str] chunks) -> [Embedder] -> (List[List[float]] vectors) -> [FAISS Index]
+📁 AI_DATA_ANALYST_CHATBOT1
+│
+├── app.py                   # The Front-Controller. Glues UI, Agent, and Data layers together.
+├── config.py                # Single Source of Truth for Magic Numbers (Max lengths, Allowed files)
+├── test_validation.py       # Python Unit tests to prevent breaking changes in validation logic
+├── requirements.txt         # All pip dependencies
+├── .env.example             # Security template 
+│
+└── 📁 utils                 # Engine Room
+    ├── __init__.py          # Marks folder as a Python Package
+    ├── chunker.py           # Uses Langchain standard chunkers to split DataFrame text rows.
+    ├── document_loader.py   # Pandas wrapper blocking EmptyDataError & Bad Extensions.
+    ├── embedder.py          # Uses `sentence-transformers` for dense vector creation.
+    ├── retriever.py         # Manages the FAISS index for high-speed similarity search.
+    └── validator.py         # Prevents empty strings, massive strings, or trailing whitespaces.
 ```
-
-## Data Flow
-1. **User Upload**: A `.csv` or `.xlsx` file is uploaded via the Streamlit sidebar widget.
-2. **Parsing**: The `document_loader` module parses this into a purely in-memory Pandas DataFrame.
-3. **Profiling**: The UI automatically reads the DataFrame shape and dtypes, and outputs an initial preview.
-4. **Query Input**: The user inputs a question (e.g., "Show me a bar chart of sales by month").
-5. **Validation**: The `validator.py` checks query length and content, aborting if empty or excessively long.
-6. **Code Generation**: The LangChain `create_pandas_dataframe_agent` wraps the DataFrame into a prompt context, sends the prompt to the specified LLM (GPT-4o), and generates python code utilizing tools like pandas or plotly.
-7. **Execution**: The generated code executes. The results (Data frames, text insights, charts) are dynamically routed back to the Streamlit UI.
-8. **Extraction & Download**: Any text-based output can be extracted and downloaded via the UI download button.
-
-## Function & Library Glossary
-
-### Main Libraries
-- **`streamlit`**: Manages the web frontend. Chosen for rapid Python-UI prototyping. Alternative: *Gradio* or *Dash*.
-- **`pandas`**: The backbone of the data processing and tabular manipulation. Alternative: *Polars* (faster but less LLM agent integration).
-- **`langchain` / `langchain-experimental`**: Orchestrates LLM calls, specifically the `pandas_dataframe_agent` which is essential for translating natural language to code. Alternative: *LlamaIndex* or custom exec wrappers.
-- **`plotly`**: Creating interactive visual plots generated by the LLM. Alternative: *Matplotlib* / *Seaborn*.
-- **`sentence-transformers` / `faiss-cpu`**: Powering local embeddings and retrieval index for citation and textual indexing. Alternative: *OpenAI Embeddings* / *ChromaDB*.
-
-### Function Explanations
-- `load_document(file_obj, file_name)`: Takes a raw file stream, infers type, and returns a Pandas dataframe. Prevents system crash on bad file types.
-- `chunk_dataframe_to_text(df)`: Converts DataFrame rows into strings. Exists to map tabular data into typical unstructured text RAG loops.
-- `create_embeddings(texts)`: Runs text through a transformer to create numeric arrays. Required to calculate vector similarity.
-- `initialize_vector_store(...)`: Builds a local FAISS index. Required for fast contextual lookup.
-- `validate_query(query)`: Enforces business logic over the user input (limits max length). Prevents prompt injection attacks and token limit overflows.
-- `generate_response(df, query)`: The core inference router. Dispatches the dataframe + query to the Langchain agent and handles the output state.
 
 ---
 
-## Run Guide
+## 4. Software Architecture & Data Flow Diagrams
 
-Step 1: Create a virtual environment
-```bash
-python -m venv venv
+### High-Level Component Flow
+```mermaid
+graph TD
+    A([User]) -->|Upload File| B[Streamlit UI]
+    A -->|Text Query| B
+    
+    subgraph Data Ingestion
+        B --> C{Document Loader}
+        C -->|Pandas DataFrame| E
+    end
+
+    subgraph Security Layer
+        B --> D{Query Validator}
+        D -->|Sanitized Prompt| E
+    end
+
+    subgraph LLM Intelligence Core
+        E[[LangChain Pandas Agent]] -->|Python Script| F(Local Sandbox Engine)
+        F -.->|Error Traceback Feedback| E
+    end
+
+    F -->|Result: Metrics & Charts| B
 ```
 
-Step 2: Activate the virtual environment
+### RAG (Retrieval-Augmented Generation) Pipeline
+If tabular mathematical processing is insufficient, the application utilizes textual extraction.
+
+```mermaid
+graph LR
+    subgraph Fallback RAG System
+        A[(DataFrame)] -->|Text Mapping| B(Chunker)
+        B -->|Segments| C[Sentence-Transformer]
+        C -->|Numerical Array| D[(FAISS Index)]
+        D -->|Semantic Match| E(Retriever)
+    end
+    E --> F[Citations Generation]
+```
+
+---
+
+## 5. Code-Level Execution Mechanics
+
+### 1. The LangChain Pandas Agent (`app.py`)
+The most complex mechanism in the tool is:
+```python
+agent = create_pandas_dataframe_agent(
+    llm, df, verbose=True, allow_dangerous_code=True, handle_parsing_errors=True
+)
+```
+**What does this do?** 
+It forces the LLM into a `ReAct` (Reason+Act) loop. The LLM is given access to a "Tool" (Python Interpreter). It gets a prompt describing the columns and head of `df`. Based on the query, it generates `df.groupby(...).sum()`, writes it via Python `exec()`, reads the console output, processes the conclusion, and stops.
+
+### 2. Validation Constraints (`utils/validator.py`)
+```python
+if len(sanitized) > MAX_QUERY_LENGTH:
+    raise ValueError(...)
+```
+Protects the API budget. If a user pastes a 10,000-word essay into the Streamlit chat box, the local python environment stops it instantly before sending it up to the API, saving extreme token costs.
+
+### 3. Fault Tolerant Parsing (`utils/document_loader.py`)
+By isolating `pd.read_csv()` inside `try/except` blocks specifically checking for `pd.errors.EmptyDataError`, we ensure that a user uploading an empty file gets a polite Streamlit UI popup instead of the entire server crashing.
+
+---
+
+## 6. Technology Definitions
+
+| Component | Role | Why We Chose It over Alternatives |
+| :--- | :--- | :--- |
+| **Streamlit** | Interface | Eliminates the need for HTML/CSS/React. Allows building UI purely in Python. |
+| **Pandas** | Tabular Data | Most deeply supported array/table tool in the ML ecosystem. Native integration with LLMs. |
+| **LangChain** | Execution Orchestrator | Raw LLM API calls do not know how to "Run Code". Langchain gives models the "Tools" allowing them to execute code. |
+| **Gemini / OpenAI** | Intelligence | The models used to parse the English query into highly accurate Python script. |
+| **Plotly** | Visualization | Unlike Matplotlib which generates static PNGs, Plotly generates dynamic JS graphs you can zoom and hover over. |
+| **FAISS** | Vector Search | Because we only need localized, in-memory semantic lookup, FAISS is 100x lighter/faster than spinning up Pinecone or Chroma databases. |
+
+---
+
+## 7. Comprehensive Setup & Execution Guide
+
+### Prerequisites
+You strictly need **Python 3.10** or higher installed.
+
+### Step 1: Environment Isolation
+We use virtual environments (`venv`) so project dependencies don't corrupt your system python folder.
 ```bash
+git clone https://github.com/mstar89/AI_DATA_ANALYST_CHATBOT1.git
+cd AI_DATA_ANALYST_CHATBOT1
+
 # Windows
+python -m venv venv
 venv\Scripts\activate
-# Mac/Linux
+
+# macOS / Linux
+python -m venv venv
 source venv/bin/activate
 ```
 
-Step 3: Install dependencies
+### Step 2: System Installations
+Install all pip dependencies.
 ```bash
 pip install -r requirements.txt
 ```
+*Note: If you run into issues with `faiss`, you may explicitly run `pip install faiss-cpu`.*
 
-Step 4: Configure environment variables
+### Step 3: Security File Injection
+Never upload `.env` to GitHub. Copy the template and add your LLM API Key (Ensure it matches whether you use GOOGLE_API_KEY for Gemini, or OPENAI_API_KEY).
 ```bash
 cp .env.example .env
-# Open .env and add your OPENAI_API_KEY
 ```
+Open `.env` in any text editor and fill your key.
 
-Step 5: Run validation tests
+### Step 4: Health Check validation
+Before running the main server, ensure the internal functions operate exactly as designed.
 ```bash
 python test_validation.py
-# Verify all 5 tests PASS
 ```
 
-Step 6: Start application
+### Step 5: Booting the Server
 ```bash
 streamlit run app.py
 ```
-
-Step 7: Using the application
-Open `http://localhost:8501`, upload a sample CSV from your files, enter a query like "What are the columns?", verify the output.
+Streamlit will launch a local network port (Usually `localhost:8501`). Your default browser will automatically open and point to it.
 
 ---
 
-## Top 5 Errors & Fixes
-1. **Error**: `ModuleNotFoundError: No module named 'langchain'`
-   - **Fix**: You forgot to install requirements or are in the wrong python environment. Run `pip install -r requirements.txt`.
-2. **Error**: `openai.AuthenticationError / Missing or invalid OPENAI_API_KEY`
-   - **Fix**: The environment variable `OPENAI_API_KEY` is missing or invalid. Check your `.env` file and verify your subscription.
-3. **Error**: `ValueError: The uploaded file is corrupted`
-   - **Fix**: The pandas parser failed to read the CSV/Excel. Open it in a separate tool to ensure it's valid UTF-8 tabular data without corrupt metadata.
-4. **Error**: `ImportError: faiss is not installed.`
-   - **Fix**: FAISS can be tricky on windows or mac M-series. Run `pip install faiss-cpu` (or `faiss-gpu` if you have NVIDIA architecture).
-5. **Error**: `Streamlit: Address already in use`
-   - **Fix**: Port 8501 is occupied. Run Streamlit on a different port using `streamlit run app.py --server.port 8502`.
+## 8. Example Queries & Capabilities
+
+Here is what the project is capable of doing once booted up and handed a dataset (like a Sales or HR dataset):
+
+**A. Profiling Tasks**
+- *"Give me a summary of the dataset."*
+- *"Are there any missing or null values in this file?"*
+- *"What is the standard deviation of the Salary column?"*
+
+**B. Data Manipulation Tasks**
+- *"Filter the data to only show users who live in New York and are older than 30."*
+- *"What is the total revenue grouped by Product Category?"*
+
+**C. Automated Charting**
+- *"Plot a bar chart showing the sum of sales per region."*
+- *"Create a scatter plot of Age versus Income."*
+- *"Generate a correlation matrix heatmap for all numeric variables."*
+
+*(Notice you never have to type `import matplotlib` or `df.groupby()`. The LLM writes it silently in the background).*
 
 ---
 
-## Project Presentation (10 Slides)
+## 9. Limitations, Bottlenecks & Future Roadmap
 
-- **Slide 1 - Title Info**: "AI Data Analyst Chatbot". Presenter details.
-- **Slide 2 - Problem Statement**: Business data is locked behind Python/SQL skill barriers. We aim to democratize data analytics.
-- **Slide 3 - Objectives**: Auto-profile files, answer analytical queries, render Plotly visual charts autonomously.
-- **Slide 4 - Tech Stack**: Python, Streamlit, LangChain, OpenAI, Pandas, FAISS. Why these were chosen.
-- **Slide 5 - System Architecture**: Visually show the Data Flow diagram (from Upload to RAG fallback and LLM Agent).
-- **Slide 6 - Key Implementations**: Code snippet highlighting `create_pandas_dataframe_agent()` and `validate_query()`.
-- **Slide 7 - Safety & Validation**: Error handling, input validation limit checking, catching API down-times.
-- **Slide 8 - Live Demo / Walkthrough**: "Now I will upload a dataset, and we'll ask it to plot sales by region."
-- **Slide 9 - Challenges Faced**: Securing the code execution sandbox, managing LLM token limits, optimizing vector search time.
-- **Slide 10 - Future Potential**: Multilingual support, automated scheduled reports, SQL database direct connections.
+**Present Limitations:**
+- **Local Sandbox Confinement:** The parameter `allow_dangerous_code=True` executes Python `ast.exec()` directly on your local machine. If a malicious user queried *"Format my hard drive"*, the LLM *could* attempt to write an `os.system` script. While highly unlikely with standard models, for enterprise deployment, this MUST be routed to an isolated docker pod or systems like **E2B Sandboxes**.
+- **Context Token Windows:** If you upload a dataset with 5,000 columns, the LLM will fail because inputting 5,000 column names into the "System Prompt Prompt Context" will overflow the context window (e.g. going over 8k/128k limits).
+- **In-Memory Volatility:** Streamlit re-runs scripts on every widget click. While cached, large files directly consume system RAM via Pandas.
 
----
-
-## Viva Questions & Answers
-
-1. **Q**: What is the purpose of LangChain in this project?
-   - **A**: It provides the orchestration framework to inject Pandas DataFrames into LLM prompts and handles the sequential loops of generating code, executing it, and reading the output.
-2. **Q**: What is the difference between FAISS and ChromaDB?
-   - **A**: FAISS is a library purely for similarity search of dense vectors, while ChromaDB is a full vector database with persistency features.
-3. **Q**: Why convert dataframe rows to text for chunking?
-   - **A**: Standard Large Language Models process text sequentially. Converting tabular data to text allows standard RAG (retrieval-augmented-generation) pipelines to locate specific rows by semantic meaning.
-4. **Q**: How did you handle exceptions during file uploads?
-   - **A**: Using `utils/document_loader.py`, I implemented `try/except` blocks specifically catching `pd.errors.EmptyDataError` and `pd.errors.ParserError`.
-5. **Q**: Explain the `allow_dangerous_code=True` flag.
-   - **A**: The LangChain Pandas agent uses the python `ast`/`exec` modules to run arbitrary python code. Since this is a local project analyzing user's own data, we explicitly allow it, though in production it requires a sandboxed container (like E2B).
-6. **Q**: What are embeddings?
-   - **A**: High-dimensional numerical representations of text where distance correlates with semantic similarity.
-7. **Q**: Why Streamlit instead of React/Django?
-   - **A**: Streamlit is built specifically for data scientists to quickly turn data scripts into interactive Web apps with minimal frontend code overhead.
-8. **Q**: How do you prevent users from overloading the LLM?
-   - **A**: Implemented a `validate_query()` utility that bounds the string length to `config.MAX_QUERY_LENGTH`.
-9. **Q**: How does the system plot charts?
-   - **A**: By prompting the LLM agent to specifically output code that generates a Plotly figure or Matplotlib axis, which Streamlit native elements can render.
-10. **Q**: What happens when an unsupported file type is uploaded?
-    - **A**: Handled in Streamlit (restricting UI to explicit extensions) and in `document_loader.py` by checking `SUPPORTED_FILE_TYPES` and throwing a configured error gracefully.
-
----
-
-## Final Submission Report - IEEE Format
-
-**Abstract:** The complexity of modern data analytics necessitates advanced programming and statistical knowledge, often alienating non-technical stakeholders. This project proposes an AI-driven Data Analyst Chatbot capable of interpreting natural language queries to autonomously profile datasets, derive statistical insights, and generate dynamic visualizations. Leveraging Large Language Models (LLMs) and the LangChain experimental code-execution paradigm, the system processes CSV and Excel files entirely in-memory. Initial findings suggest significant reductions in query-to-answer latency for typical descriptive analytics tasks compared to manual coding procedures.
-
-**I. Introduction:** Data democratization relies heavily on removing technical barriers. Current BI tools require querying syntaxes (DAX, SQL) which steepen learning curves. This initiative aims to produce an end-to-end user interface utilizing state-of-the-art Generative pre-trained transformers to bridge human intent directly with python code execution pipelines.
-
-**II. Literature Review:** (1) "Attention Is All You Need" (Vaswani et al. 2017) introduced the transformer backbone powering modern LLMs. (2) "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks" (Lewis et al. 2020) demonstrated combining parametric memory with non-parametric stores. (3) "Language Models are Few-Shot Learners" (Brown et al. 2020) validated in-context learning. (4) Work on Semantic Parsing outlines methodologies mapping NL to SQL/Python execution scopes. (5) AI-assisted exploratory data analysis literature affirms the efficacy of AI chatbots streamlining initial dataset interpretations. 
-
-**III. System Design:** The framework follows a modular split: A Streamlit-based presentation tier handles user telemetry, file IO, and visual rendering arrays. A Data layer translates unstructured binary to `pandas.DataFrames`, incorporating secondary embeddings via `sentence-transformers` stored in a FAISS index. The orchestration tier relies on `LangChain` to inject tabular data abstractions into a restricted system execution environment where GPT-3.5/GPT-4 formulates executable queries in python. 
-
-**IV. Implementation:** The backend integrates Python 3.10+ environments. Environment vectors are stored implicitly via `.env`. Core modules (`document_loader`, `chunker`, `retriever`) process ingest logic applying recursive character splitting. A central validator mitigates buffer overload logic. Inference runs sequentially: schema retrieval -> code synthesis -> local evaluation -> display output. Exception tracing bounds all API network requests routing standardized failures back to the user interface.
-
-**V. Results:** Empirical validation executed via the `test_validation.py` test suite confirmed zero regressions across import paths, configuration binding, or end-to-end validation vectors limit constraints. The application actively responds to descriptive analytical queries natively displaying Plotly charting. Testing against standardized datasets (e.g., Iris, Titanic) yielded successful generation of correlative matrix visualizations solely through English requests.
-
-**VI. Conclusion:** The application demonstrates that embedding a localized python executor underneath a generative model shell drastically reduces the friction of primary exploratory data analysis (EDA). Small parameter models, coupled with tightly defined tool access (like the LangChain Pandas agent), provide accurate deterministic tabular analytics.
-
-**VII. Future Work:** Scaling to multi-document indexing, implementing strict containerized sandboxing (via docker or API like E2B), and adding proactive, unprompted statistical anomaly anomaly detectors as soon as the schema is read into memory. Fine-tuning models solely focused on Pandas execution may further drive down inference API costs.
-
-**References:**
-[1] Vaswani, A., et al., "Attention is all you need." *Advances in neural information processing systems* 30 (2017).
-[2] Lewis, P., et al., "Retrieval-augmented generation for knowledge-intensive NLP tasks." *Advances in Neural Information Processing Systems* 33 (2020): 9459-9474.
-[3] Brown, T., et al., "Language models are few-shot learners." *Advances in neural information processing systems* 33 (2020): 1877-1901.
-[4] McKinney, W., "Data structures for statistical computing in python." *Proceedings of the 9th Python in Science Conference*. Vol. 445. 2010.
-[5] Streamlit Inc., "Streamlit Documentation," 2024. [Online]. Available: https://docs.streamlit.io/.
-[6] LangChain AI, "LangChain Experimental Ecosystem," 2024.
-[7] Plotly Technologies, "Plotly Express Python API," 2024.
-[8] Johnson, J., Douze, M., & Jégou, H. "Billion-scale similarity search with GPUs." *IEEE Transactions on Big Data* 7.3 (2019): 535-547.
-[9] Reimers, N., & Gurevych, I. "Sentence-bert: Sentence embeddings using siamese bert-networks." *arXiv preprint arXiv:1908.10084* (2019).
-[10] Touvron, H., et al., "Llama 2: Open foundation and fine-tuned chat models." *arXiv preprint arXiv:2307.09288* (2023).
+**Future Roadmap:**
+- **Polars / PySpark Migration:** Swapping pandas for Polars to handle Big Data (Data passing 5GB+ in local RAM).
+- **Persistent Conversational Memory:** Allowing the Chatbot to remember answers from 5 queries ago (Current structure treats each prompt autonomously via the data frame agent state wrapper).
+- **Direct Database Connectors:** Bypass CSV files entirely by having Langchain execute standard `psycopg2` SQL queries directly on production databases (Supabase, AWS).
