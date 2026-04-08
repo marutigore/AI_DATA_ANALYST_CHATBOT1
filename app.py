@@ -69,7 +69,7 @@ def handle_file_upload() -> Optional[pd.DataFrame]:
                     if "current_file_name" not in st.session_state or st.session_state.current_file_name != uploaded_file.name:
                         st.session_state.current_file_name = uploaded_file.name
                         st.session_state.chunks = chunk_dataframe_to_text(df)
-                        st.session_state.messages = [] # Clear history on new file
+                        # st.session_state.messages = [] # Commented out: Keep history until program close
                         st.session_state.retriever_initialized = False # Force FAISS rebuild
                         st.toast(f'Dataset "{uploaded_file.name}" loaded instantly!', icon='✅')
                         st.balloons()
@@ -83,8 +83,8 @@ def handle_file_upload() -> Optional[pd.DataFrame]:
                         col2.metric("Features (Columns)", df.shape[1])
                         col3.metric("Missing Data Points", df.isna().sum().sum())
                         
-                        st.markdown("**Data Snapshot (First 5 records):**")
-                        st.dataframe(df.head(5), use_container_width=True)
+                        st.markdown("**Data Snapshot (First 10 records):**")
+                        st.dataframe(df.head(10), use_container_width=True)
                     
                     return df
        
