@@ -1,4 +1,4 @@
-# 🤖 AI Data Analyst Chatbot – The Complete Guide
+#  AI Data Analyst Chatbot – The Complete Guide
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Framework-FF4B4B)
