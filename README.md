@@ -138,6 +138,9 @@ Protects the API budget. If a user pastes a 10,000-word essay into the Streamlit
 ### 3. Fault Tolerant Parsing (`utils/document_loader.py`)
 By isolating `pd.read_csv()` inside `try/except` blocks specifically checking for `pd.errors.EmptyDataError`, we ensure that a user uploading an empty file gets a polite Streamlit UI popup instead of the entire server crashing.
 
+### 4. Semantic Search & Citations (RAG Expansion in `app.py`)
+When you see the **"View Retrieved Context / Citations"** box with text like `Semantic Match: service_type, is_mix_service...`, this is the backend RAG (Retrieval-Augmented Generation) system at work. Upon file upload, the dataset is segmented into "chunks" and converted into vector embeddings by FAISS. When you ask a question, the app scans these embeddings to find the most mathematically similar chunk of text (often the CSV column headers or specific rows). This context is pulled into the background to help the AI understand your data structure. The expandable UI box simply surfaces this raw, retrieved text snippet to demonstrate the internal vector retrieval process to the user.
+
 ---
 
 ## 6. Technology Definitions
