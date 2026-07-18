@@ -4,3 +4,6 @@ __pycache__/
 .pytest_cache/
 *.pyc
 PRIVATE_README.md
+temp_chart*.json
+.vscode/
+*.log
