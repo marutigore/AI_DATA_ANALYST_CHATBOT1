@@ -57,20 +57,24 @@ Every file in this project is strictly isolated to handle one specific layer of 
 ```text
 📁 AI_DATA_ANALYST_CHATBOT1
 │
-├── app.py                   # The Front-Controller. Glues UI, Agent, and Data layers together.
-├── config.py                # Single Source of Truth for Magic Numbers (Max lengths, Allowed files)
-├── test_validation.py       # Python Unit tests to prevent breaking changes in validation logic
+├── app.py                   # Streamlit Frontend UI
+├── api.py                   # FastAPI REST API Backend
+├── config.py                # Global configurations & constants
+├── test_api.py              # Pytest suite for API endpoints & mocking
+├── test_validation.py       # Pytest suite for RAG and validator functions
 ├── requirements.txt         # All pip dependencies
-├── .env.example             # Security template 
+├── .env.example             # Security environment template 
+├── run.ps1                  # PowerShell script to run both servers concurrently
 │
 └── 📁 utils                 # Engine Room
     ├── __init__.py          # Marks folder as a Python Package
-    ├── chunker.py           # Uses Langchain standard chunkers to split DataFrame text rows.
-    ├── document_loader.py   # Pandas wrapper blocking EmptyDataError & Bad Extensions.
-    ├── embedder.py          # Uses `sentence-transformers` for dense vector creation.
-    ├── retriever.py         # Manages the FAISS index for high-speed similarity search.
-    └── validator.py         # Prevents empty strings, massive strings, or trailing whitespaces.
+    ├── chunker.py           # Segmenting DataFrames for indexing
+    ├── document_loader.py   # Loading CSV/Excel safely
+    ├── embedder.py          # Embedding generation with Sentence Transformers
+    ├── retriever.py         # Session-scoped FAISS vector indexing
+    └── validator.py         # Query length/content sanitization
 ```
+
 
 ---
 
