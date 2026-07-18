@@ -30,19 +30,20 @@ class ChatResponse(BaseModel):
     response: str
     plot_json: Optional[str] = None
 
-def init_agent(df: pd.DataFrame):
+def init_agent(df: pd.DataFrame, session_id: str):
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash-lite",
         temperature=0,
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
-    custom_prefix = """You are Luminary AI, a fast, expert data analyst.
+    chart_filename = f"temp_chart_{session_id[:8]}.json"
+    custom_prefix = f"""You are Luminary AI, a fast, expert data analyst.
 
 For ALL chart/plot/graph requests:
 1. Use ONLY `plotly.express` (it is pre-imported as `px`).
 2. Create the figure with a single, concise `px.*` call.
 3. NEVER call `fig.show()`.
-4. Save the figure to a file: `fig.write_json("temp_chart.json")`
+4. Save the figure to a file: `fig.write_json("{chart_filename}")`
 5. Print ONLY the word: CHART_DONE
 6. Your final answer must be ONLY: "I have generated the chart for you."
 
@@ -131,14 +132,13 @@ async def upload_file(file: UploadFile = File(...)):
         import io
         df = load_document(io.BytesIO(contents), file.filename)
         
-        # Initialize the LangChain Pandas agent
-        agent = init_agent(df)
-        
         # Generate a unique session ID
         session_id = str(uuid.uuid4())
+        agent = init_agent(df, session_id)
         SESSION_STORE[session_id] = {
             "agent": agent,
             "filename": file.filename,
+            "chart_filename": f"temp_chart_{session_id[:8]}.json",
         }
         
         # Compute KPIs for Streamlit
@@ -179,16 +179,16 @@ async def chat_with_data(request: ChatRequest):
 
         # Fast path: read chart from disk if agent wrote it
         plot_json_str = None
-        chart_path = "temp_chart.json"
-        if os.path.exists(chart_path):
+        chart_filename = session.get("chart_filename", f"temp_chart_{request.session_id[:8]}.json")
+        if os.path.exists(chart_filename):
             try:
-                with open(chart_path, "r", encoding="utf-8") as f:
+                with open(chart_filename, "r", encoding="utf-8") as f:
                     plot_json_str = f.read()
-                os.remove(chart_path)
+                os.remove(chart_filename)
                 # Clean up the output text for chart responses
                 output_text = "I have generated the chart for you."
             except Exception as e:
-                logger.error(f"Failed to read temp_chart.json: {e}")
+                logger.error(f"Failed to read {chart_filename}: {e}")
                 
         return ChatResponse(
             response=output_text,
