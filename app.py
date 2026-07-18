@@ -56,18 +56,23 @@ def render_sidebar():
     if st.sidebar.button("💿 DATASET EXPLORER", use_container_width=True):
         st.session_state.current_view = "DATASET EXPLORER"
         
-        
-    # Removed unrequired disabled buttons to keep the sidebar clean
+    st.sidebar.markdown("---")
+    if st.sidebar.button("🧹 Clear Chat History", use_container_width=True):
+        st.session_state.messages = []
+        st.toast("Chat history cleared!", icon="🧹")
+        st.rerun()
 
     return uploaded_file
 
-@st.cache_data
 def upload_to_backend(bytes_data, file_name):
     try:
         files = {"file": (file_name, bytes_data)}
-        response = requests.post(f"{API_URL}/upload", files=files)
+        response = requests.post(f"{API_URL}/upload", files=files, timeout=30)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Connection timed out. The backend server did not respond in time.")
+        return None
     except Exception as e:
         st.error(f"Failed to connect to backend API: {e}")
         return None
@@ -117,6 +122,11 @@ def render_chat_view():
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
+                    # Render citations if present in history
+                    if "citations" in msg and msg["citations"] is not None:
+                        with st.expander("📖 View Retrieved RAG Citations"):
+                            for idx, cit in enumerate(msg["citations"]):
+                                st.markdown(f"**Chunk {idx+1}:**\n```\n{cit}\n```")
                     # Render historical plots if they exist
                     if "plot_json" in msg and msg["plot_json"] is not None:
                         try:
@@ -138,7 +148,8 @@ def render_chat_view():
                     try:
                         response = requests.post(
                             f"{API_URL}/chat",
-                            json={"session_id": session_id, "prompt": prompt}
+                            json={"session_id": session_id, "prompt": prompt},
+                            timeout=60
                         )
                         if response.status_code == 429:
                             st.warning("⚠️ **API Quota Exceeded.** Your free-tier Gemini limit has been reached. Please wait a few minutes and try again, or visit [Google AI Studio](https://ai.dev/rate-limit) to check your usage.")
@@ -153,6 +164,13 @@ def render_chat_view():
                             data = response.json()
                             st.markdown(data["response"])
                             
+                            # Render citations if any
+                            citations = data.get("citations")
+                            if citations:
+                                with st.expander("📖 View Retrieved RAG Citations"):
+                                    for idx, cit in enumerate(citations):
+                                        st.markdown(f"**Chunk {idx+1}:**\n```\n{cit}\n```")
+                            
                             plot_json_str = data.get("plot_json")
                             if plot_json_str:
                                 try:
@@ -166,7 +184,8 @@ def render_chat_view():
                             st.session_state.messages.append({
                                 "role": "assistant", 
                                 "content": data["response"],
-                                "plot_json": plot_json_str
+                                "plot_json": plot_json_str,
+                                "citations": citations
                             })
                     except requests.exceptions.Timeout:
                         st.warning("⏱️ **Connection timed out.** The backend server did not respond in time. Please check the server is running and try again.")
