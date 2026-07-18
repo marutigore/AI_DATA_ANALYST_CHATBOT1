@@ -2,10 +2,13 @@ import os
 import uuid
 import json
 import logging
+import time
+import asyncio
 from typing import Optional, Dict
 
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import pandas as pd
@@ -13,14 +16,48 @@ from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from utils.document_loader import load_document
+from config import SESSION_TTL_MINUTES
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Luminary AI Backend")
 
+# Add CORS Middleware to prevent frontend-backend origin issues
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # In-memory session store: mapping session_id to an AgentExecutor
 SESSION_STORE: Dict[str, dict] = {}
+
+async def session_cleanup_loop():
+    while True:
+        await asyncio.sleep(60) # Run cleanup every 60 seconds
+        now = time.time()
+        expired = []
+        for session_id, session in SESSION_STORE.items():
+            created_at = session.get("created_at", 0)
+            if now - created_at > SESSION_TTL_MINUTES * 60:
+                expired.append(session_id)
+        
+        for session_id in expired:
+            logger.info(f"Session {session_id} expired and cleaned up.")
+            chart_filename = SESSION_STORE[session_id].get("chart_filename")
+            if chart_filename and os.path.exists(chart_filename):
+                try:
+                    os.remove(chart_filename)
+                except Exception as e:
+                    logger.error(f"Error removing temp file {chart_filename} during cleanup: {e}")
+            del SESSION_STORE[session_id]
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(session_cleanup_loop())
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -125,6 +162,22 @@ def generate_suggestions(df: pd.DataFrame) -> list:
 
     return suggestions[:3]
 
+@app.get("/api/sessions")
+async def get_active_sessions():
+    """Debug endpoint to retrieve information about active sessions."""
+    active_sessions = []
+    now = time.time()
+    for session_id, session in SESSION_STORE.items():
+        created_at = session.get("created_at", 0)
+        age_minutes = (now - created_at) / 60
+        active_sessions.append({
+            "session_id": session_id,
+            "filename": session.get("filename"),
+            "age_minutes": round(age_minutes, 2),
+            "ttl_remaining_minutes": round(SESSION_TTL_MINUTES - age_minutes, 2)
+        })
+    return {"active_sessions_count": len(SESSION_STORE), "sessions": active_sessions}
+
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -139,6 +192,7 @@ async def upload_file(file: UploadFile = File(...)):
             "agent": agent,
             "filename": file.filename,
             "chart_filename": f"temp_chart_{session_id[:8]}.json",
+            "created_at": time.time(),
         }
         
         # Compute KPIs for Streamlit
