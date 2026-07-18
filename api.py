@@ -17,6 +17,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from utils.document_loader import load_document
 from utils.validator import validate_query
+from utils.chunker import chunk_dataframe_to_text
+from utils.embedder import create_embeddings
+from utils.retriever import SessionVectorStore
 from config import SESSION_TTL_MINUTES, MAX_UPLOAD_SIZE_MB
 
 load_dotenv()
@@ -67,6 +70,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     plot_json: Optional[str] = None
+    citations: Optional[list] = None
 
 def init_agent(df: pd.DataFrame, session_id: str):
     llm = ChatGoogleGenerativeAI(
@@ -203,11 +207,24 @@ async def upload_file(file: UploadFile = File(...)):
         # Generate a unique session ID
         session_id = str(uuid.uuid4())
         agent = init_agent(df, session_id)
+        
+        # Build Vector Store for RAG Pipeline
+        vector_store = SessionVectorStore()
+        try:
+            chunks = chunk_dataframe_to_text(df)
+            if chunks:
+                embeddings = create_embeddings(chunks)
+                vector_store.initialize(embeddings, chunks)
+                logger.info(f"RAG vector store successfully initialized for session {session_id}")
+        except Exception as rag_err:
+            logger.error(f"Failed to initialize RAG vector store for session {session_id}: {rag_err}")
+            
         SESSION_STORE[session_id] = {
             "agent": agent,
             "filename": file.filename,
             "chart_filename": f"temp_chart_{session_id[:8]}.json",
             "created_at": time.time(),
+            "vector_store": vector_store,
         }
         
         # Compute KPIs for Streamlit
@@ -246,9 +263,28 @@ async def chat_with_data(request: ChatRequest):
         # Validate query
         validated_prompt = validate_query(request.prompt)
         
+        # Retrieve context from RAG vector store if initialized
+        citations = []
+        vector_store = session.get("vector_store")
+        if vector_store and vector_store.index is not None:
+            try:
+                query_embs = create_embeddings([validated_prompt])
+                if query_embs:
+                    matches = vector_store.retrieve_similar(query_embs[0], top_k=3)
+                    for match in matches:
+                        citations.append(match["content"])
+            except Exception as e:
+                logger.error(f"RAG retrieval failed: {e}")
+        
+        # If we have citations, append them to the prompt for LLM column/row schema context
+        agent_prompt = validated_prompt
+        if citations:
+            context_str = "\n".join([f"- {c}" for c in citations])
+            agent_prompt = f"{validated_prompt}\n\n[Retrieved Context Chunks (Reference Only)]:\n{context_str}"
+        
         # Run the synchronous agent in a thread pool so it doesn't block the event loop.
         # No timeout — let the AI take as long as it needs.
-        response = await run_in_threadpool(agent.invoke, validated_prompt)
+        response = await run_in_threadpool(agent.invoke, agent_prompt)
         output_text = response.get("output", "")
 
         # Fast path: read chart from disk if agent wrote it
@@ -266,7 +302,8 @@ async def chat_with_data(request: ChatRequest):
                 
         return ChatResponse(
             response=output_text,
-            plot_json=plot_json_str
+            plot_json=plot_json_str,
+            citations=citations if citations else None
         )
     except HTTPException as he:
         raise he
