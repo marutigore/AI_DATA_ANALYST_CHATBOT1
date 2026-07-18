@@ -15,7 +15,7 @@ MAX_UPLOAD_SIZE_MB = 10
 SUPPORTED_FILE_TYPES = [".csv", ".xlsx", ".xls"]
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
-MAX_QUERY_LENGTH = 500
+MAX_QUERY_LENGTH = 2000
 SESSION_TTL_MINUTES = 30
 
 # Setup basic logging configuration

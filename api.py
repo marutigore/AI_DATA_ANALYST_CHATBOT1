@@ -16,7 +16,8 @@ from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from utils.document_loader import load_document
-from config import SESSION_TTL_MINUTES
+from utils.validator import validate_query
+from config import SESSION_TTL_MINUTES, MAX_UPLOAD_SIZE_MB
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -162,6 +163,11 @@ def generate_suggestions(df: pd.DataFrame) -> list:
 
     return suggestions[:3]
 
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint to ensure API backend is running."""
+    return {"status": "healthy", "timestamp": time.time()}
+
 @app.get("/api/sessions")
 async def get_active_sessions():
     """Debug endpoint to retrieve information about active sessions."""
@@ -182,6 +188,15 @@ async def get_active_sessions():
 async def upload_file(file: UploadFile = File(...)):
     try:
         contents = await file.read()
+        
+        # Validate file size
+        file_size_mb = len(contents) / (1024 * 1024)
+        if file_size_mb > MAX_UPLOAD_SIZE_MB:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File size ({file_size_mb:.2f} MB) exceeds the limit of {MAX_UPLOAD_SIZE_MB} MB."
+            )
+            
         import io
         df = load_document(io.BytesIO(contents), file.filename)
         
@@ -213,6 +228,8 @@ async def upload_file(file: UploadFile = File(...)):
             "preview_json": df.head(40).to_json(),
             "suggestions": suggestions
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"Error processing upload: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -226,9 +243,12 @@ async def chat_with_data(request: ChatRequest):
     agent = session["agent"]
     
     try:
+        # Validate query
+        validated_prompt = validate_query(request.prompt)
+        
         # Run the synchronous agent in a thread pool so it doesn't block the event loop.
         # No timeout — let the AI take as long as it needs.
-        response = await run_in_threadpool(agent.invoke, request.prompt)
+        response = await run_in_threadpool(agent.invoke, validated_prompt)
         output_text = response.get("output", "")
 
         # Fast path: read chart from disk if agent wrote it
@@ -248,6 +268,10 @@ async def chat_with_data(request: ChatRequest):
             response=output_text,
             plot_json=plot_json_str
         )
+    except HTTPException as he:
+        raise he
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         error_str = str(e)
         # Give a friendly message on quota errors
