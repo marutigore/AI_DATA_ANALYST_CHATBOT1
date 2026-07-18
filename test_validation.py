@@ -77,5 +77,29 @@ def test_end_to_end_validation():
     with pytest.raises(ValueError, match="Query exceeds maximum length"):
         validate_query(long_query)
 
+def test_session_vector_store(monkeypatch):
+    """Test 6: Verify SessionVectorStore class works in isolation."""
+    from utils.retriever import SessionVectorStore
+    from utils.embedder import create_embeddings
+    
+    class MockModel:
+        def encode(self, texts, convert_to_numpy=True):
+            import numpy as np
+            return np.zeros((len(texts), 3))
+            
+    monkeypatch.setattr("utils.embedder.get_embeddings_model", lambda *args, **kwargs: MockModel())
+    
+    texts = ["Doc A", "Doc B"]
+    embs = create_embeddings(texts)
+    
+    store = SessionVectorStore()
+    assert store.initialize(embs, texts) is True
+    
+    # Mock a query embedding
+    q_emb = [0.0, 0.0, 0.0]
+    matches = store.retrieve_similar(q_emb, top_k=1)
+    assert len(matches) == 1
+    assert matches[0]["content"] in texts
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
