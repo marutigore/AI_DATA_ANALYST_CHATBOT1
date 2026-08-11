@@ -62,7 +62,31 @@ def render_sidebar():
         st.toast("Chat history cleared!", icon="🧹")
         st.rerun()
 
+    # Chat Session Export / Import Utility
+    if st.session_state.get("messages"):
+        import json
+        session_export_json = json.dumps(st.session_state.messages, indent=2)
+        st.sidebar.download_button(
+            label="📥 Export Session JSON",
+            data=session_export_json,
+            file_name=f"luminary_chat_session_{st.session_state.get('session_id', 'export')[:8]}.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+    imported_session_file = st.sidebar.file_uploader("📤 Restore Session JSON", type=["json"], key="session_importer")
+    if imported_session_file is not None:
+        try:
+            import json
+            imported_history = json.load(imported_session_file)
+            if isinstance(imported_history, list):
+                st.session_state.messages = imported_history
+                st.toast("Restored chat session history!", icon="🎉")
+        except Exception as e:
+            st.sidebar.error(f"Failed to import session: {e}")
+
     return uploaded_file
+
 
 def upload_to_backend(bytes_data, file_name):
     try:
