@@ -85,7 +85,10 @@ def render_sidebar():
         except Exception as e:
             st.sidebar.error(f"Failed to import session: {e}")
 
+    ui_components.render_server_telemetry_widget(API_URL)
+
     return uploaded_file
+
 
 
 def upload_to_backend(bytes_data, file_name):

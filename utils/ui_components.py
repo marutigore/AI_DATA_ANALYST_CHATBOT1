@@ -417,8 +417,23 @@ def render_interactive_explorer(df):
             st.plotly_chart(fig, use_container_width=True)
         else:
             top_counts = df[selected_col].value_counts().head(10).reset_index()
-            top_counts.columns = [selected_col, "Count"]
-            fig = px.bar(top_counts, x=selected_col, y="Count", title=f"Top Categories in {selected_col}")
-            fig = style_luminary_figure(fig, height=280)
-            st.plotly_chart(fig, use_container_width=True)
+def render_server_telemetry_widget(api_url: str):
+    """Fetches and displays live backend API health and active session telemetry."""
+    import requests
+    try:
+        res = requests.get(f"{api_url}/health", timeout=3)
+        if res.ok:
+            st.sidebar.markdown("---")
+            st.sidebar.markdown("<div style='font-size:0.75rem; color: #2DD4BF;'>🟢 Backend Status: Online</div>", unsafe_allow_html=True)
+            
+            # Fetch active sessions count
+            sess_res = requests.get(f"{api_url}/sessions", timeout=3)
+            if sess_res.ok:
+                count = sess_res.json().get("active_sessions_count", 0)
+                st.sidebar.markdown(f"<div style='font-size:0.75rem; color: #94A3B8;'>Active Sessions: {count}</div>", unsafe_allow_html=True)
+        else:
+            st.sidebar.markdown("<div style='font-size:0.75rem; color: #EF4444;'>🔴 Backend Offline</div>", unsafe_allow_html=True)
+    except Exception:
+        st.sidebar.markdown("<div style='font-size:0.75rem; color: #EF4444;'>🔴 Backend Offline</div>", unsafe_allow_html=True)
+
 
