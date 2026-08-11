@@ -229,8 +229,21 @@ def test_stats_engine():
     anova_res = run_anova(df, "gender", "score")
     assert "f_statistic" in anova_res
 
+def test_hybrid_search():
+    """Test 15: Verify Hybrid BM25 + FAISS Reciprocal Rank Fusion Search."""
+    from utils.hybrid_search import hybrid_rrf_search
+    
+    docs = ["Column Name: revenue", "Column Name: customer_id", "Sales trend over years"]
+    faiss_matches = [{"content": "Sales trend over years", "score": 0.1}]
+    
+    # Query for exact keyword 'revenue'
+    fused_results = hybrid_rrf_search("revenue", [0.0, 0.0], docs, faiss_matches, top_k=2)
+    assert len(fused_results) > 0
+    assert fused_results[0]["content"] == "Column Name: revenue"
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
