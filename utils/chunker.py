@@ -3,7 +3,8 @@ Document Chunking Utility.
 Responsible for breaking down text representations into manageable chunks.
 """
 import logging
-from typing import List
+from typing import List, Tuple
+
 import pandas as pd
 from config import CHUNK_SIZE, CHUNK_OVERLAP
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -52,3 +53,38 @@ def chunk_dataframe_to_text(df: pd.DataFrame, chunk_size: int = CHUNK_SIZE, chun
     except Exception as e:
         logger.error(f"Error during dataframe chunking: {e}")
         raise RuntimeError(f"Chunking failed: {str(e)}")
+
+def hierarchical_chunk_dataframe(
+    df: pd.DataFrame, 
+    chunk_size: int = CHUNK_SIZE, 
+    chunk_overlap: int = CHUNK_OVERLAP
+) -> Tuple[str, List[str]]:
+    """
+    Hierarchical Parent-Child Chunking.
+    Creates a high-level Parent Summary chunk (schema, column dtypes, first 10 rows)
+    alongside granular Child row chunks for detailed vector lookup.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to chunk.
+        
+    Returns:
+        Tuple[str, List[str]]: (parent_summary, child_chunks)
+    """
+    if df.empty:
+        return "", []
+        
+    # Parent Summary Chunk: Metadata Overview
+    schema_info = ", ".join([f"{col} ({dtype})" for col, dtype in zip(df.columns, df.dtypes)])
+    parent_summary = (
+        f"DATASET METADATA OVERVIEW:\n"
+        f"Total Shape: {df.shape[0]} rows x {df.shape[1]} columns\n"
+        f"Schema & Column Types: {schema_info}\n"
+        f"Preview Data:\n{df.head(10).to_csv(index=False)}"
+    )
+    
+    # Child Chunks: Sub-segments of data rows
+    child_chunks = chunk_dataframe_to_text(df, chunk_size, chunk_overlap)
+    
+    logger.info(f"Generated Hierarchical Parent summary and {len(child_chunks)} child chunks.")
+    return parent_summary, child_chunks
+

@@ -241,8 +241,20 @@ def test_hybrid_search():
     assert len(fused_results) > 0
     assert fused_results[0]["content"] == "Column Name: revenue"
 
+def test_hierarchical_chunking():
+    """Test 16: Verify Hierarchical Parent-Child Chunking strategy."""
+    import pandas as pd
+    from utils.chunker import hierarchical_chunk_dataframe
+    
+    df = pd.DataFrame({"item": ["A", "B"], "val": [10, 20]})
+    parent, children = hierarchical_chunk_dataframe(df)
+    
+    assert "DATASET METADATA OVERVIEW" in parent
+    assert len(children) > 0
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
