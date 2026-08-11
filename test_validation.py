@@ -156,8 +156,24 @@ def test_query_engine():
     assert res.iloc[1]["category"] == "B"
     assert res.iloc[1]["total_sales"] == 300
 
+def test_data_cleaner():
+    """Test 11: Verify Automated Data Profiling & Cleaning Utility."""
+    import pandas as pd
+    from utils.data_cleaner import auto_clean_dataframe
+    
+    raw_df = pd.DataFrame({
+        "name": [" Alice ", "Bob "],
+        "price": ["$1,200.50 ", "$350.00"]
+    })
+    cleaned_df, report = auto_clean_dataframe(raw_df)
+    
+    assert cleaned_df["name"].iloc[0] == "Alice"
+    assert cleaned_df["price"].iloc[0] == 1200.50
+    assert "price" in report["parsed_currency_cols"]
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
