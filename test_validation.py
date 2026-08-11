@@ -186,8 +186,28 @@ def test_report_generator():
     assert len(pdf_bytes) > 500
     assert pdf_bytes.startswith(b"%PDF")
 
+def test_db_connector():
+    """Test 13: Verify SQL Database Connector Interface with SQLite."""
+    import sqlite3
+    from utils.db_connector import get_db_table_names, query_db_to_dataframe
+    
+    # Create in-memory SQLite DB
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE users (id INT, name TEXT)")
+    conn.execute("INSERT INTO users VALUES (1, 'Alice'), (2, 'Bob')")
+    conn.commit()
+    
+    tables = get_db_table_names(conn)
+    assert "users" in tables
+    
+    df = query_db_to_dataframe(conn, "SELECT * FROM users")
+    assert len(df) == 2
+    assert df.iloc[0]["name"] == "Alice"
+    conn.close()
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
