@@ -18,12 +18,34 @@ CHUNK_OVERLAP = 50
 MAX_QUERY_LENGTH = 2000
 SESSION_TTL_MINUTES = 30
 
-# Setup basic logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+import json
+import time
+
+class JSONLogFormatter(logging.Formatter):
+    """Formats log entries as structured JSON objects for ELK / Datadog log ingestion."""
+    def format(self, record: logging.LogRecord) -> str:
+        log_obj = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage()
+        }
+        if record.exc_info:
+            log_obj["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_obj)
+
+def setup_structured_logging():
+    """Configures structured JSON logging globally."""
+    handler = logging.StreamHandler()
+    handler.setFormatter(JSONLogFormatter())
+    root_logger = logging.getLogger()
+    root_logger.handlers = [handler]
+    root_logger.setLevel(logging.INFO)
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 
 def check_keys() -> bool:
     """

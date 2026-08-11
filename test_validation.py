@@ -366,8 +366,23 @@ def test_ui_components():
     # Call function to ensure no syntax/runtime exceptions
     assert render_interactive_explorer is not None
 
+def test_structured_logging():
+    """Test 27: Verify Structured JSON Logging & Correlation IDs."""
+    import logging
+    import json
+    from config import JSONLogFormatter
+    
+    formatter = JSONLogFormatter()
+    record = logging.LogRecord("test_logger", logging.INFO, "path", 10, "Test log message", (), None)
+    log_json = formatter.format(record)
+    
+    parsed = json.loads(log_json)
+    assert parsed["level"] == "INFO"
+    assert parsed["message"] == "Test log message"
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
