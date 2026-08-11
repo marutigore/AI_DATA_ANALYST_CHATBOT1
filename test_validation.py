@@ -285,8 +285,24 @@ def test_dynamic_top_k():
     k_small = calculate_dynamic_top_k("hi", doc_count=2)
     assert k_small == 2
 
+def test_memory():
+    """Test 20: Verify Multi-Turn Summary Buffer Memory Utility."""
+    from utils.memory import ConversationSummaryBuffer
+    
+    mem = ConversationSummaryBuffer(max_recent_turns=2)
+    mem.add_turn("user", "Hello 1")
+    mem.add_turn("assistant", "Hi 1")
+    mem.add_turn("user", "Hello 2")
+    mem.add_turn("assistant", "Hi 2")
+    mem.add_turn("user", "Hello 3")
+    
+    context = mem.get_formatted_context()
+    assert "Summary of earlier turns" in context
+    assert "Hello 3" in context
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
