@@ -101,5 +101,27 @@ def test_session_vector_store(monkeypatch):
     assert len(matches) == 1
     assert matches[0]["content"] in texts
 
+def test_sandbox_security():
+    """Test 7: Verify AST sandbox catches forbidden imports and builtins."""
+    from utils.sandbox import validate_code_security
+    
+    # Valid pandas code
+    valid_code = "import pandas as pd\ndf['total'] = df['a'] + df['b']"
+    is_valid, reason = validate_code_security(valid_code)
+    assert is_valid is True
+    
+    # Forbidden import
+    invalid_import = "import os\nos.system('dir')"
+    is_valid, reason = validate_code_security(invalid_import)
+    assert is_valid is False
+    assert "Security Violation" in reason
+    
+    # Forbidden builtin call
+    invalid_builtin = "eval('1 + 1')"
+    is_valid, reason = validate_code_security(invalid_builtin)
+    assert is_valid is False
+    assert "Security Violation" in reason
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
