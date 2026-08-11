@@ -7,3 +7,5 @@ PRIVATE_README.md
 temp_chart*.json
 .vscode/
 *.log
+.vector_cache/
+

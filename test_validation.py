@@ -252,8 +252,23 @@ def test_hierarchical_chunking():
     assert "DATASET METADATA OVERVIEW" in parent
     assert len(children) > 0
 
+def test_vector_cache():
+    """Test 17: Verify Hash-Based Vector Store Disk Cache Utility."""
+    from utils.vector_cache import save_cached_embeddings, get_cached_embeddings
+    
+    mock_bytes = b"sample_csv_data_for_cache_test"
+    embs = [[0.1, 0.2], [0.3, 0.4]]
+    docs = ["Doc 1", "Doc 2"]
+    
+    assert save_cached_embeddings(mock_bytes, embs, docs) is True
+    
+    cached_embs, cached_docs = get_cached_embeddings(mock_bytes)
+    assert cached_embs == embs
+    assert cached_docs == docs
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
