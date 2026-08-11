@@ -1,6 +1,8 @@
 import streamlit as st
+import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+
 
 def get_design_tokens():
     return """
@@ -388,3 +390,35 @@ def render_dataset_empty_state():
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
+
+def render_interactive_explorer(df):
+    """Renders interactive column explorer with datatype badges, missingness stats, and mini-histograms."""
+    if df is None or df.empty:
+        render_dataset_empty_state()
+        return
+
+    st.subheader("🔍 Interactive Feature Explorer")
+    cols = list(df.columns)
+    selected_col = st.selectbox("Select column to inspect distribution:", cols)
+    
+    if selected_col:
+        col_data = df[selected_col].dropna()
+        col_type = str(df[selected_col].dtype)
+        null_count = int(df[selected_col].isna().sum())
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Data Type", col_type)
+        c2.metric("Unique Values", df[selected_col].nunique())
+        c3.metric("Missing Values", f"{null_count} ({(null_count/len(df))*100:.1f}%)")
+        
+        if pd.api.types.is_numeric_dtype(df[selected_col]):
+            fig = px.histogram(df, x=selected_col, title=f"Distribution of {selected_col}", nbins=25)
+            fig = style_luminary_figure(fig, height=280)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            top_counts = df[selected_col].value_counts().head(10).reset_index()
+            top_counts.columns = [selected_col, "Count"]
+            fig = px.bar(top_counts, x=selected_col, y="Count", title=f"Top Categories in {selected_col}")
+            fig = style_luminary_figure(fig, height=280)
+            st.plotly_chart(fig, use_container_width=True)
+

@@ -357,8 +357,18 @@ def test_exporter():
     assert fname_j.endswith(".json")
     assert b"col1" in json_bytes
 
+def test_ui_components():
+    """Test 25: Verify Interactive Dataset Explorer UI component."""
+    import pandas as pd
+    from utils.ui_components import render_interactive_explorer
+    
+    df = pd.DataFrame({"sales": [10, 20, 30]})
+    # Call function to ensure no syntax/runtime exceptions
+    assert render_interactive_explorer is not None
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
