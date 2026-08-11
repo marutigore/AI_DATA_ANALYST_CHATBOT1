@@ -103,3 +103,16 @@ def test_chat_empty_query():
     )
     assert response.status_code in (400, 422)
 
+def test_openapi_docs():
+    """Test API OpenAPI schema JSON endpoint."""
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    assert "paths" in response.json()
+    assert "/api/upload" in response.json()["paths"]
+
+def test_rate_limit_headers():
+    """Test API response headers on health check."""
+    response = client.get("/api/health")
+    assert response.status_code == 200
+
+
