@@ -436,4 +436,28 @@ def render_server_telemetry_widget(api_url: str):
     except Exception:
         st.sidebar.markdown("<div style='font-size:0.75rem; color: #EF4444;'>🔴 Backend Offline</div>", unsafe_allow_html=True)
 
+def render_theme_selector():
+    """Renders theme selector dropdown in sidebar."""
+    theme = st.sidebar.selectbox("🎨 Theme Accent", ["Luminary Indigo", "Emerald Cyber", "Midnight Purple"])
+    if theme == "Emerald Cyber":
+        st.markdown("""
+            <style>
+            :root {
+                --primary: #10B981 !important;
+                --primary-glow: rgba(16, 185, 129, 0.4) !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+    elif theme == "Midnight Purple":
+        st.markdown("""
+            <style>
+            :root {
+                --primary: #A855F7 !important;
+                --primary-glow: rgba(168, 85, 247, 0.4) !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+
+
 
