@@ -5,6 +5,7 @@ import logging
 import time
 import asyncio
 from typing import Optional, Dict
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -24,17 +25,6 @@ from config import SESSION_TTL_MINUTES, MAX_UPLOAD_SIZE_MB
 
 load_dotenv()
 logger = logging.getLogger(__name__)
-
-app = FastAPI(title="Luminary AI Backend")
-
-# Add CORS Middleware to prevent frontend-backend origin issues
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # In-memory session store: mapping session_id to an AgentExecutor
 SESSION_STORE: Dict[str, dict] = {}
@@ -59,9 +49,25 @@ async def session_cleanup_loop():
                     logger.error(f"Error removing temp file {chart_filename} during cleanup: {e}")
             del SESSION_STORE[session_id]
 
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(session_cleanup_loop())
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Launch background session cleanup task
+    cleanup_task = asyncio.create_task(session_cleanup_loop())
+    yield
+    # Shutdown: Cancel background cleanup task cleanly
+    cleanup_task.cancel()
+
+app = FastAPI(title="Luminary AI Backend", lifespan=lifespan)
+
+# Add CORS Middleware to prevent frontend-backend origin issues
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class ChatRequest(BaseModel):
     session_id: str

@@ -68,7 +68,13 @@ def upload_to_backend(bytes_data, file_name):
     try:
         files = {"file": (file_name, bytes_data)}
         response = requests.post(f"{API_URL}/upload", files=files, timeout=30)
-        response.raise_for_status()
+        if not response.ok:
+            try:
+                error_msg = response.json().get("detail", response.text)
+            except:
+                error_msg = response.text
+            st.error(f"Backend Upload Failed: {error_msg}")
+            return None
         return response.json()
     except requests.exceptions.Timeout:
         st.error("⏱️ Connection timed out. The backend server did not respond in time.")
