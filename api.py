@@ -78,12 +78,11 @@ class ChatResponse(BaseModel):
     plot_json: Optional[str] = None
     citations: Optional[list] = None
 
+from utils.llm_factory import get_llm
+
 def init_agent(df: pd.DataFrame, session_id: str):
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite",
-        temperature=0,
-        google_api_key=os.getenv("GOOGLE_API_KEY")
-    )
+    llm = get_llm("gemini-2.5-flash-lite", temperature=0)
+
     chart_filename = f"temp_chart_{session_id[:8]}.json"
     custom_prefix = f"""You are Luminary AI, a fast, expert data analyst.
 

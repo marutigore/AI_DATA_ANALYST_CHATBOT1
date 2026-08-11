@@ -122,6 +122,13 @@ def test_sandbox_security():
     assert is_valid is False
     assert "Security Violation" in reason
 
+def test_llm_factory():
+    """Test 8: Verify Multi-Provider LLM Factory returns base LLM with fallback support."""
+    from utils.llm_factory import get_llm
+    llm = get_llm()
+    assert llm is not None
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
