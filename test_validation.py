@@ -340,8 +340,26 @@ def test_guardrails():
     assert is_safe is False
     assert "Security Violation" in msg
 
+def test_exporter():
+    """Test 24: Verify Natural Language Data Export Engine Utility."""
+    import pandas as pd
+    from utils.exporter import export_dataframe
+    
+    df = pd.DataFrame({"col1": [1, 2], "col2": ["A", "B"]})
+    
+    # Test CSV
+    csv_bytes, fname, mime = export_dataframe(df, "csv")
+    assert fname.endswith(".csv")
+    assert b"col1,col2" in csv_bytes
+    
+    # Test JSON
+    json_bytes, fname_j, mime_j = export_dataframe(df, "json")
+    assert fname_j.endswith(".json")
+    assert b"col1" in json_bytes
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
