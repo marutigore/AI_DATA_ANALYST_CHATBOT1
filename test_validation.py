@@ -310,8 +310,26 @@ def test_agent_team():
     role2, p2 = AgentTeamOrchestrator.enhance_prompt_for_role("What is the mean price?")
     assert role2 == "STATISTICAL_ANALYSIS"
 
+def test_eda_engine():
+    """Test 22: Verify Autonomous One-Click EDA Generator Utility."""
+    import pandas as pd
+    from utils.eda_engine import generate_eda_summary
+    
+    df = pd.DataFrame({
+        "age": [20, 30, 40, 50],
+        "city": ["NY", "SF", "LA", "CHI"]
+    })
+    eda = generate_eda_summary(df)
+    
+    assert eda["overview"]["total_rows"] == 4
+    assert eda["overview"]["duplicate_rows"] == 0
+
+    assert "age" in eda["numeric_summary"]
+    assert "city" in eda["top_categories"]
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
