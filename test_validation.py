@@ -205,8 +205,33 @@ def test_db_connector():
     assert df.iloc[0]["name"] == "Alice"
     conn.close()
 
+def test_stats_engine():
+    """Test 14: Verify Statistical Hypothesis Testing Engine."""
+    import pandas as pd
+    from utils.stats_engine import calculate_correlations, run_ttest, run_anova
+    
+    df = pd.DataFrame({
+        "gender": ["M", "M", "F", "F"],
+        "score": [90, 85, 70, 65],
+        "age": [25, 26, 22, 21]
+    })
+    
+    # Correlation
+    corrs = calculate_correlations(df)
+    assert "score" in corrs
+    
+    # T-test
+    ttest_res = run_ttest(df, "gender", "score")
+    assert "p_value" in ttest_res
+    assert ttest_res["statistically_significant"] is True
+    
+    # ANOVA
+    anova_res = run_anova(df, "gender", "score")
+    assert "f_statistic" in anova_res
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
