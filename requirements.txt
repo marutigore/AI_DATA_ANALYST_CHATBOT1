@@ -15,4 +15,6 @@ uvicorn==0.28.0
 python-multipart==0.0.9
 requests==2.31.0
 duckdb==1.5.5
+reportlab==5.0.0
+
 

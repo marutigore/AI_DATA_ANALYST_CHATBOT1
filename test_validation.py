@@ -171,8 +171,24 @@ def test_data_cleaner():
     assert cleaned_df["price"].iloc[0] == 1200.50
     assert "price" in report["parsed_currency_cols"]
 
+def test_report_generator():
+    """Test 12: Verify Executive PDF Report Generator produces valid PDF bytes."""
+    from utils.report_generator import generate_pdf_report
+    
+    metrics = {"rows": 100, "cols": 5, "memory_mb": 1.2, "missing": 0}
+    chat_history = [
+        {"role": "user", "content": "Show sales summary"},
+        {"role": "assistant", "content": "Total sales amount is $50,000."}
+    ]
+    pdf_bytes = generate_pdf_report("sales_data.csv", metrics, chat_history)
+    
+    assert isinstance(pdf_bytes, bytes)
+    assert len(pdf_bytes) > 500
+    assert pdf_bytes.startswith(b"%PDF")
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
