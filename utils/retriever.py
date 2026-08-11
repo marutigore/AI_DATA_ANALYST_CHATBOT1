@@ -88,3 +88,15 @@ def initialize_vector_store(embeddings: List[List[float]], documents: List[str])
 def retrieve_similar(query_embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
     return _GLOBAL_STORE.retrieve_similar(query_embedding, top_k)
 
+def calculate_dynamic_top_k(query: str, doc_count: int, default_k: int = 3) -> int:
+    """
+    Dynamically adjusts top-K retrieval count based on query complexity and index size.
+    """
+    if doc_count <= 0:
+        return 0
+    words_count = len(query.split()) if query else 0
+    # Dynamic top-k increases for verbose/complex queries
+    dynamic_k = max(default_k, min(words_count // 2, 10))
+    return min(dynamic_k, doc_count)
+
+

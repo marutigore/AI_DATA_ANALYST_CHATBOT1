@@ -275,8 +275,19 @@ def test_query_rewriter():
     assert "quantity" in rewritten
     assert "Schema Context" in rewritten
 
+def test_dynamic_top_k():
+    """Test 19: Verify Dynamic Top-K Retrieval Optimization helper."""
+    from utils.retriever import calculate_dynamic_top_k
+    
+    k = calculate_dynamic_top_k("what is the total sales grouped by region and category", doc_count=50)
+    assert k >= 4
+    
+    k_small = calculate_dynamic_top_k("hi", doc_count=2)
+    assert k_small == 2
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
