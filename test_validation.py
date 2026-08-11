@@ -300,8 +300,19 @@ def test_memory():
     assert "Summary of earlier turns" in context
     assert "Hello 3" in context
 
+def test_agent_team():
+    """Test 21: Verify Multi-Agent Delegation Pipeline intent classification."""
+    from utils.agent_team import AgentTeamOrchestrator
+    
+    role1, p1 = AgentTeamOrchestrator.enhance_prompt_for_role("Plot a bar chart of sales")
+    assert role1 == "VISUALIZATION"
+    
+    role2, p2 = AgentTeamOrchestrator.enhance_prompt_for_role("What is the mean price?")
+    assert role2 == "STATISTICAL_ANALYSIS"
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
