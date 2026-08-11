@@ -380,8 +380,18 @@ def test_structured_logging():
     assert parsed["level"] == "INFO"
     assert parsed["message"] == "Test log message"
 
+def test_benchmark_generator():
+    """Test 28: Verify Synthetic Dataset Benchmark & Load Generator Utility."""
+    from tests.benchmark_generator import generate_benchmark_dataset
+    
+    df = generate_benchmark_dataset(num_rows=100)
+    assert len(df) == 100
+    assert "sales_amount" in df.columns
+    assert "transaction_id" in df.columns
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
