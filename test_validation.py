@@ -266,8 +266,18 @@ def test_vector_cache():
     assert cached_embs == embs
     assert cached_docs == docs
 
+def test_query_rewriter():
+    """Test 18: Verify Query Rewriting & HyDE Generator Utility."""
+    from utils.query_rewriter import rewrite_query_for_search
+    
+    rewritten = rewrite_query_for_search("show avg sales qty", schema_info="sales, qty")
+    assert "average" in rewritten
+    assert "quantity" in rewritten
+    assert "Schema Context" in rewritten
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
