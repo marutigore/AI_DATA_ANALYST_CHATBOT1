@@ -142,8 +142,23 @@ def test_rate_limiter():
     assert allowed is False
     assert retry_after > 0
 
+def test_query_engine():
+    """Test 10: Verify DuckDB High-Performance Query Engine executes SQL on DataFrames."""
+    import pandas as pd
+    from utils.query_engine import execute_sql_query
+    
+    df = pd.DataFrame({"category": ["A", "A", "B"], "sales": [100, 200, 300]})
+    res = execute_sql_query(df, "SELECT category, SUM(sales) as total_sales FROM df GROUP BY category ORDER BY category")
+    
+    assert len(res) == 2
+    assert res.iloc[0]["category"] == "A"
+    assert res.iloc[0]["total_sales"] == 300
+    assert res.iloc[1]["category"] == "B"
+    assert res.iloc[1]["total_sales"] == 300
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
 
