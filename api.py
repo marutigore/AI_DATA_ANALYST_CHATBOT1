@@ -57,7 +57,12 @@ async def lifespan(app: FastAPI):
     # Shutdown: Cancel background cleanup task cleanly
     cleanup_task.cancel()
 
+from utils.rate_limiter import RateLimitMiddleware
+
 app = FastAPI(title="Luminary AI Backend", lifespan=lifespan)
+
+# Add Rate Limit Middleware
+app.add_middleware(RateLimitMiddleware)
 
 # Add CORS Middleware to prevent frontend-backend origin issues
 app.add_middleware(
@@ -67,6 +72,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 class ChatRequest(BaseModel):

@@ -128,7 +128,22 @@ def test_llm_factory():
     llm = get_llm()
     assert llm is not None
 
+def test_rate_limiter():
+    """Test 9: Verify RateLimiter blocks requests exceeding quota."""
+    from utils.rate_limiter import RateLimiter
+    limiter = RateLimiter(requests_per_minute=2)
+    
+    # First 2 requests should be allowed
+    assert limiter.is_allowed("test_ip")[0] is True
+    assert limiter.is_allowed("test_ip")[0] is True
+    
+    # 3rd request within window should be blocked
+    allowed, retry_after = limiter.is_allowed("test_ip")
+    assert allowed is False
+    assert retry_after > 0
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
+
 
 
