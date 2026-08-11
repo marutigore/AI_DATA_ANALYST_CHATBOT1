@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Constants
-MAX_UPLOAD_SIZE_MB = 10
+MAX_UPLOAD_SIZE_MB = 200
+
 SUPPORTED_FILE_TYPES = [".csv", ".xlsx", ".xls"]
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50

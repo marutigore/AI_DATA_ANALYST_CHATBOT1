@@ -46,13 +46,16 @@ def test_upload_success(mock_agent_creator, mock_llm_creator):
     assert len(data["suggestions"]) > 0
 
 def test_upload_file_too_large():
-    # Create file content larger than 10MB (limit set in config)
-    large_content = "a" * (11 * 1024 * 1024) # 11MB
-    file_data = {"file": ("large.csv", io.BytesIO(large_content.encode("utf-8")), "text/csv")}
-    response = client.post("/api/upload", files=file_data)
-    
-    assert response.status_code == 400
-    assert "exceeds the limit" in response.json()["detail"]
+    # Patch MAX_UPLOAD_SIZE_MB to 1MB for fast testing
+    from unittest.mock import patch
+    with patch("api.MAX_UPLOAD_SIZE_MB", 1):
+        large_content = "a" * (2 * 1024 * 1024) # 2MB
+        file_data = {"file": ("large.csv", io.BytesIO(large_content.encode("utf-8")), "text/csv")}
+        response = client.post("/api/upload", files=file_data)
+        
+        assert response.status_code == 400
+        assert "exceeds the limit" in response.json()["detail"]
+
 
 def test_upload_unsupported_type():
     file_data = {"file": ("test.txt", io.BytesIO(b"some text data"), "text/plain")}
