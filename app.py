@@ -179,13 +179,17 @@ def render_chat_view():
         prompt = st.session_state.messages[-1]["content"]
         with chat_container:
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing parameters via Backend API..."):
+                with st.status("⚡ Luminary AI Agent Reasoning...", expanded=True) as status_box:
+                    status_box.write("🔍 Retrieving tabular RAG context & schema...")
+                    status_box.write("⚙️ Executing code in AST restricted sandbox...")
                     try:
                         response = requests.post(
                             f"{API_URL}/chat",
                             json={"session_id": session_id, "prompt": prompt},
                             timeout=60
                         )
+                        status_box.update(label="✅ Analysis Complete!", state="complete", expanded=False)
+
                         if response.status_code == 429:
                             st.warning("⚠️ **API Quota Exceeded.** Your free-tier Gemini limit has been reached. Please wait a few minutes and try again, or visit [Google AI Studio](https://ai.dev/rate-limit) to check your usage.")
                             st.session_state.messages.pop()
